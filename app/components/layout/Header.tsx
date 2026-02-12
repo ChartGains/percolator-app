@@ -20,6 +20,8 @@ const navLinks = [
   { href: "/my-markets", label: "Admin" },
   { href: "/guide", label: "Guide" },
   { href: "/agents", label: "Agents" },
+  { href: "/report-bug", label: "Bugs" },
+  { href: "/join", label: "Join Us" },
 ];
 
 export const Header: FC = () => {

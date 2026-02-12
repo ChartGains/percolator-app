@@ -385,7 +385,7 @@ const DevnetMintContent: FC = () => {
           </div>
         </ScrollReveal>
 
-        <div className="max-w-xl space-y-6">
+        <div className="max-w-xl mx-auto space-y-6">
 
           {/* Step 1 — Wallet */}
           <ScrollReveal delay={0}>
