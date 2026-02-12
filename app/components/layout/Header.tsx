@@ -39,6 +39,7 @@ export const Header: FC = () => {
   // Scroll detection
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
+    onScroll(); // Check initial scroll position on mount (e.g. page refresh while scrolled)
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
