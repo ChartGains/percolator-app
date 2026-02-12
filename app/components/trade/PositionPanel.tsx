@@ -52,10 +52,11 @@ export const PositionPanel: FC<{ slabAddress: string }> = ({ slabAddress }) => {
   if (!userAccount) {
     return (
       <div className="relative rounded-none border border-[var(--border)]/50 bg-[var(--bg)]/80 p-3">
-        <div className="space-y-2">
-          <div className="h-2 w-24 bg-[var(--border)]/50" />
-          <div className="h-2 w-32 bg-[var(--border)]/50" />
-          <div className="h-2 w-20 bg-[var(--border)]/50" />
+        <div className="flex flex-col items-center py-6 text-center">
+          <p className="text-[11px] font-medium text-[var(--text-muted)]">No open position</p>
+          <p className="mt-1.5 text-[10px] text-[var(--text-dim)] leading-relaxed max-w-[240px]">
+            Connect your wallet and deposit collateral to start trading.
+          </p>
         </div>
       </div>
     );
@@ -157,9 +158,17 @@ export const PositionPanel: FC<{ slabAddress: string }> = ({ slabAddress }) => {
     <div className="relative rounded-none border border-[var(--border)]/50 bg-[var(--bg)]/80 p-3">
 
       {!hasPosition ? (
-        <div className="flex flex-col items-center py-4 text-center">
-          <p className="text-[11px] text-[var(--text-muted)]">No open position</p>
-          <p className="mt-1 text-[10px] text-[var(--text-dim)]">Open a trade to see your position here</p>
+        <div className="flex flex-col items-center py-6 text-center">
+          <p className="text-[11px] font-medium text-[var(--text-muted)]">No open position</p>
+          {account.capital > 0n ? (
+            <p className="mt-1.5 text-[10px] text-[var(--text-dim)] leading-relaxed max-w-[240px]">
+              You have collateral deposited — use the trade form to open a position.
+            </p>
+          ) : (
+            <p className="mt-1.5 text-[10px] text-[var(--text-dim)] leading-relaxed max-w-[240px]">
+              Deposit collateral to start trading. Head to the <span className="text-[var(--accent)]">Deposit</span> tab to fund your account.
+            </p>
+          )}
         </div>
       ) : (
         <div>
