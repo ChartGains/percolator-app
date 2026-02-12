@@ -12,7 +12,7 @@ interface PricePoint {
 }
 
 const DEFAULT_W = 600;
-const H = 200;
+const H = 300;
 const PAD = { top: 16, bottom: 20, left: 8, right: 8 };
 const CHART_H = H - PAD.top - PAD.bottom;
 
@@ -318,13 +318,12 @@ export const PriceChart: FC<{ slabAddress: string }> = ({ slabAddress }) => {
       <div ref={hoverDateRef} className="mb-1 h-4 text-right text-[10px] text-[var(--text-muted)]">
         {"\u00A0"}
       </div>
-      <div ref={chartWrapCallback} className="h-[200px] lg:h-[350px]">
+      <div ref={chartWrapCallback}>
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}
           className="w-full"
-          preserveAspectRatio="none"
-          style={{ height: "100%" }}
+          preserveAspectRatio="xMidYMid meet"
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
         >
