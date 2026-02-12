@@ -335,7 +335,7 @@ export const TradeForm: FC<{ slabAddress: string }> = ({ slabAddress }) => {
           style={{
             background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${maxLeverage > 1 ? ((leverage - 1) / (maxLeverage - 1)) * 100 : 100}%, rgba(255,255,255,0.03) ${maxLeverage > 1 ? ((leverage - 1) / (maxLeverage - 1)) * 100 : 100}%, rgba(255,255,255,0.03) 100%)`,
           }}
-          className="mb-1.5 h-1 w-full cursor-pointer appearance-none accent-[var(--accent)] [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-[var(--accent)]"
+          className="mb-3 h-1 w-full cursor-pointer appearance-none accent-[var(--accent)] [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-[var(--accent)]"
         />
         <div className="flex gap-1">
           {availableLeverage.map((l) => (
