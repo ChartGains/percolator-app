@@ -121,17 +121,30 @@ function TradePageInner({ slab }: { slab: string }) {
     <div ref={pageRef} className="mx-auto max-w-7xl overflow-x-hidden gsap-fade">
 
       {/* ── MOBILE: Sticky header ── */}
-      <div className="sticky top-0 z-30 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg)]/95 px-3 py-2 backdrop-blur-sm lg:hidden">
-        <div className="min-w-0">
-          <h1 className="text-sm font-bold text-[var(--text)]" style={{ fontFamily: "var(--font-display)" }}>
-            {symbol}/USD <span className="text-xs font-normal text-[var(--text-muted)]">PERP</span>
-          </h1>
+      <div className="sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--bg)]/95 px-3 py-2 backdrop-blur-sm lg:hidden">
+        <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <h1 className="text-sm font-bold text-[var(--text)]" style={{ fontFamily: "var(--font-display)" }}>
+              {symbol}/USD <span className="text-xs font-normal text-[var(--text-muted)]">PERP</span>
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            {health && <HealthBadge level={health.level} />}
+            {priceDisplay && (
+              <span className="text-sm font-bold text-[var(--text)]">{priceDisplay}</span>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {health && <HealthBadge level={health.level} />}
-          {priceDisplay && (
-            <span className="text-sm font-bold text-[var(--text)]">{priceDisplay}</span>
-          )}
+        <div className="mt-1 flex items-center gap-2">
+          <span className="flex items-center text-[10px] text-[var(--text-dim)]">
+            {shortAddress}
+            <CopyButton text={slab} />
+          </span>
+          <ShareButton
+            slabAddress={slab}
+            marketName={symbol}
+            price={BigInt(Math.round((priceUsd ?? 0) * 1e6))}
+          />
         </div>
       </div>
 
@@ -178,10 +191,10 @@ function TradePageInner({ slab }: { slab: string }) {
           MOBILE LAYOUT  (< lg)
           Single column, everything stacked
           ════════════════════════════════════════════════════════ */}
-      <div className="flex flex-col gap-2 px-3 pb-4 lg:hidden">
+      <div className="flex flex-col gap-2 px-3 pb-4 lg:hidden min-w-0 w-full">
         {/* Chart */}
         <ErrorBoundary label="PriceChart">
-          <div className="[&>div]:!h-[200px]">
+          <div className="w-full overflow-hidden [&>div]:!h-[200px] [&>div]:!max-w-full">
             <PriceChart slabAddress={slab} />
           </div>
         </ErrorBoundary>
