@@ -393,8 +393,8 @@ const MyMarketsPage: FC = () => {
   const { myMarkets: realMyMarkets, loading: realLoading, error, connected: walletConnected } = useMyMarkets();
   const mockMode = isMockMode();
   const connected = walletConnected || mockMode;
-  const myMarkets = (realMyMarkets.length === 0 && mockMode && !walletConnected ? getMockMyMarkets() : realMyMarkets) as MyMarket[];
-  const loading = mockMode && !walletConnected ? false : realLoading;
+  const myMarkets = (realMyMarkets.length === 0 && mockMode ? getMockMyMarkets() : realMyMarkets) as MyMarket[];
+  const loading = mockMode ? false : realLoading;
   const { connection } = useConnection();
   const [insuranceMintMap, setInsuranceMintMap] = useState<Record<string, boolean>>({});
   const [insuranceMintChecking, setInsuranceMintChecking] = useState(true);
