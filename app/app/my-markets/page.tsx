@@ -167,7 +167,7 @@ const MarketCard: FC<{
 
   return (
     <>
-      <div className="border border-[var(--border)]/50 bg-[var(--bg)]/80">
+      <div className="border border-[var(--border)]/50 bg-[var(--panel-bg)]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border)]/30 px-4 py-3">
           <div className="flex items-center gap-3">
@@ -478,7 +478,7 @@ const MyMarketsPage: FC = () => {
             <span className="font-normal text-[var(--text-muted)]">Your </span>Markets
           </h1>
           <p className="mt-2 mb-8 text-[13px] text-[var(--text-secondary)]">manage what you&apos;ve built.</p>
-          <div className="border border-[var(--border)]/50 bg-[var(--bg)]/80 p-10 text-center">
+          <div className="border border-[var(--border)]/50 bg-[var(--panel-bg)] p-10 text-center">
             <p className="text-[11px] text-[var(--text-secondary)]">connect your wallet to see your markets</p>
           </div>
         </main>
@@ -498,7 +498,7 @@ const MyMarketsPage: FC = () => {
             <span className="font-normal text-[var(--text-muted)]">Your </span>Markets
           </h1>
           <p className="mt-2 mb-8 text-[13px] text-[var(--text-secondary)]">manage what you&apos;ve built.</p>
-          <div className="border border-[var(--border)]/50 bg-[var(--bg)]/80 p-10 text-center">
+          <div className="border border-[var(--border)]/50 bg-[var(--panel-bg)] p-10 text-center">
             <p className="text-[11px] text-[var(--short)]">{error}</p>
           </div>
         </main>
@@ -516,7 +516,7 @@ const MyMarketsPage: FC = () => {
             <span className="font-normal text-[var(--text-muted)]">Your </span>Markets
           </h1>
           <p className="mt-2 mb-8 text-[13px] text-[var(--text-secondary)]">manage what you&apos;ve built.</p>
-          <div className="border border-[var(--border)]/50 bg-[var(--bg)]/80 p-10 text-center">
+          <div className="border border-[var(--border)]/50 bg-[var(--panel-bg)] p-10 text-center">
             <p className="mb-4 text-[11px] text-[var(--text-secondary)]">
               no markets created or traded on with this wallet.
               <br />
@@ -552,7 +552,7 @@ const MyMarketsPage: FC = () => {
         <p className="mt-2 mb-6 text-[13px] text-[var(--text-secondary)]">manage what you&apos;ve built.</p>
 
         {/* Summary Stats Bar */}
-        <div className="hud-corners mb-8 flex flex-col gap-4 border border-[var(--border)]/50 bg-[var(--bg)]/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="hud-corners mb-8 flex flex-col gap-4 border border-[var(--border)]/50 bg-[var(--panel-bg)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
             {[
               { label: "Total Markets", value: totalMarkets.toString() },
