@@ -36,7 +36,7 @@ function Collapsible({ title, defaultOpen = true, badge, children }: { title: st
         </span>
         <span className={`text-[10px] text-[var(--text-dim)] transition-transform duration-200 ${open ? "rotate-180" : ""}`}>▾</span>
       </button>
-      <div className={open ? "block" : "hidden"}>{children}</div>
+      <div className={`strip-inner-borders ${open ? "block" : "hidden"}`}>{children}</div>
     </div>
   );
 }
@@ -60,7 +60,7 @@ function Tabs({ tabs, children }: { tabs: string[]; children: React.ReactNode[] 
           </button>
         ))}
       </div>
-      <div className="mt-0">{children[active]}</div>
+      <div className="strip-inner-borders">{children[active]}</div>
     </div>
   );
 }
