@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useState, useEffect, useRef } from "react";
+import { FC, useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import gsap from "gsap";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -393,7 +393,8 @@ const MyMarketsPage: FC = () => {
   const { myMarkets: realMyMarkets, loading: realLoading, error, connected: walletConnected } = useMyMarkets();
   const mockMode = isMockMode();
   const connected = walletConnected || mockMode;
-  const myMarkets = (realMyMarkets.length === 0 && mockMode ? getMockMyMarkets() : realMyMarkets) as MyMarket[];
+  const mockMarkets = useMemo(() => mockMode ? getMockMyMarkets() : [], [mockMode]);
+  const myMarkets = (realMyMarkets.length === 0 && mockMode ? mockMarkets : realMyMarkets) as MyMarket[];
   const loading = mockMode ? false : realLoading;
   const { connection } = useConnection();
   const [insuranceMintMap, setInsuranceMintMap] = useState<Record<string, boolean>>({});
