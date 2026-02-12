@@ -13,11 +13,16 @@ import { useSlabState } from "@/components/providers/SlabProvider";
 import { useTokenMeta } from "@/hooks/useTokenMeta";
 import { parseHumanAmount } from "@/lib/parseAmount";
 import { formatTokenAmount } from "@/lib/format";
+import { isMockMode } from "@/lib/mock-mode";
+import { isMockSlab, getMockUserAccount } from "@/lib/mock-trade-data";
 
 export const DepositWithdrawCard: FC<{ slabAddress: string }> = ({ slabAddress }) => {
-  const { connected, publicKey } = useWallet();
+  const { connected: walletConnected, publicKey } = useWallet();
   const { connection } = useConnection();
-  const userAccount = useUserAccount();
+  const realUserAccount = useUserAccount();
+  const mockMode = isMockMode() && isMockSlab(slabAddress);
+  const connected = walletConnected || mockMode;
+  const userAccount = realUserAccount ?? (mockMode ? getMockUserAccount(slabAddress) : null);
   const { deposit, loading: depositLoading, error: depositError } = useDeposit(slabAddress);
   const { withdraw, loading: withdrawLoading, error: withdrawError } = useWithdraw(slabAddress);
   const { initUser, loading: initLoading, error: initError } = useInitUser(slabAddress);
@@ -28,7 +33,7 @@ export const DepositWithdrawCard: FC<{ slabAddress: string }> = ({ slabAddress }
   const [mode, setMode] = useState<"deposit" | "withdraw">("deposit");
   const [amount, setAmount] = useState("");
   const [lastSig, setLastSig] = useState<string | null>(null);
-  const [walletBalance, setWalletBalance] = useState<bigint | null>(null);
+  const [walletBalance, setWalletBalance] = useState<bigint | null>(mockMode ? 500_000_000n : null);
   // Track raw BigInt when MAX is used — avoids format→parse round-trip precision issues
   const maxRawRef = useRef<bigint | null>(null);
   // On-chain decimals from getTokenAccountBalance — ground truth, avoids tokenMeta race
@@ -136,6 +141,7 @@ export const DepositWithdrawCard: FC<{ slabAddress: string }> = ({ slabAddress }
 
   async function handleSubmit() {
     if (!amount || !userAccount || validationError) return;
+    if (mockMode) { setAmount(""); return; }
     try {
       // Use raw BigInt directly when MAX was clicked
       const amtNative = maxRawRef.current ?? parseHumanAmount(amount, decimals);

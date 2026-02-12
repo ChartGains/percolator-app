@@ -15,6 +15,8 @@ import { AccountKind } from "@percolator/core";
 import { PreTradeSummary } from "@/components/trade/PreTradeSummary";
 import { InfoIcon } from "@/components/ui/Tooltip";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { isMockMode } from "@/lib/mock-mode";
+import { isMockSlab, getMockUserAccountIdle } from "@/lib/mock-trade-data";
 
 const LEVERAGE_PRESETS = [1, 2, 3, 5, 10];
 const MARGIN_PRESETS = [25, 50, 75, 100];
@@ -41,8 +43,11 @@ function abs(n: bigint): bigint {
 }
 
 export const TradeForm: FC<{ slabAddress: string }> = ({ slabAddress }) => {
-  const { connected } = useWallet();
-  const userAccount = useUserAccount();
+  const { connected: walletConnected } = useWallet();
+  const realUserAccount = useUserAccount();
+  const mockMode = isMockMode() && isMockSlab(slabAddress);
+  const connected = walletConnected || mockMode;
+  const userAccount = realUserAccount ?? (mockMode ? getMockUserAccountIdle(slabAddress) : null);
   const { trade, loading, error } = useTrade(slabAddress);
   const { engine, params } = useEngineState();
   const { accounts, config: mktConfig, header } = useSlabState();
@@ -184,6 +189,14 @@ export const TradeForm: FC<{ slabAddress: string }> = ({ slabAddress }) => {
 
   async function handleTrade() {
     if (!marginInput || !userAccount || positionSize <= 0n || exceedsMargin) return;
+
+    // Mock mode — simulate trade confirmation without submitting
+    if (mockMode) {
+      setTradePhase("submitting");
+      setTimeout(() => { setTradePhase("confirming"); setMarginInput(""); }, 800);
+      setTimeout(() => setTradePhase("idle"), 2000);
+      return;
+    }
     
     // P-CRITICAL-2: Check wallet is still connected before trade
     if (!connected) {

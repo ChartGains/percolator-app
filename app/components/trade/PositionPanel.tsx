@@ -18,6 +18,8 @@ import {
   computePnlPercent,
 } from "@/lib/trading";
 import { humanizeError } from "@/lib/errorMessages";
+import { isMockMode } from "@/lib/mock-mode";
+import { isMockSlab, getMockUserAccount } from "@/lib/mock-trade-data";
 
 function abs(n: bigint): bigint {
   return n < 0n ? -n : n;
@@ -25,7 +27,9 @@ function abs(n: bigint): bigint {
 
 export const PositionPanel: FC<{ slabAddress: string }> = ({ slabAddress }) => {
   const { connection } = useConnection();
-  const userAccount = useUserAccount();
+  const realUserAccount = useUserAccount();
+  const mockMode = isMockMode() && isMockSlab(slabAddress);
+  const userAccount = realUserAccount ?? (mockMode ? getMockUserAccount(slabAddress) : null);
   const config = useMarketConfig();
   const { trade, loading: closeLoading, error: closeError } = useTrade(slabAddress);
   const { accounts, config: mktConfig, params } = useSlabState();
@@ -118,6 +122,7 @@ export const PositionPanel: FC<{ slabAddress: string }> = ({ slabAddress }) => {
 
   async function handleClose() {
     if (!userAccount || !hasPosition) return;
+    if (mockMode) { setShowConfirm(false); return; }
     try {
       let freshPositionSize = account.positionSize;
       let freshCapital = account.capital;

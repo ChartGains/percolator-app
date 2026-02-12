@@ -3,6 +3,8 @@
 import { FC, useEffect, useState, useCallback } from "react";
 import { formatTokenAmount, formatPriceE6 } from "@/lib/format";
 import { explorerTxUrl } from "@/lib/config";
+import { isMockMode } from "@/lib/mock-mode";
+import { isMockSlab, getMockTrades } from "@/lib/mock-trade-data";
 
 interface Trade {
   id: string;
@@ -31,6 +33,12 @@ export const TradeHistory: FC<{ slabAddress: string }> = ({ slabAddress }) => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchTrades = useCallback(async () => {
+    // Mock mode — use synthetic trades
+    if (isMockMode() && isMockSlab(slabAddress)) {
+      setTrades(getMockTrades(slabAddress) as Trade[]);
+      setLoading(false);
+      return;
+    }
     try {
       const res = await fetch(`/api/markets/${slabAddress}/trades?limit=25`);
       if (!res.ok) throw new Error(`${res.status}`);
