@@ -322,8 +322,7 @@ export const PriceChart: FC<{ slabAddress: string }> = ({ slabAddress }) => {
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}
-          className="w-full"
-          style={{ height: 200 }}
+          className="w-full h-[200px] lg:h-[350px]"
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
         >

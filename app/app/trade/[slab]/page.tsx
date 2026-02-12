@@ -194,7 +194,7 @@ function TradePageInner({ slab }: { slab: string }) {
       <div className="flex flex-col gap-2 px-3 pt-3 pb-4 lg:hidden min-w-0 w-full">
         {/* Chart */}
         <ErrorBoundary label="PriceChart">
-          <div className="w-full overflow-hidden [&>div]:!h-[200px] [&>div]:!max-w-full">
+          <div className="w-full overflow-hidden">
             <PriceChart slabAddress={slab} />
           </div>
         </ErrorBoundary>
@@ -243,9 +243,7 @@ function TradePageInner({ slab }: { slab: string }) {
         <div className="min-w-0 space-y-3">
           {/* Chart */}
           <ErrorBoundary label="PriceChart">
-            <div className="[&>div]:!h-[400px]">
-              <PriceChart slabAddress={slab} />
-            </div>
+            <PriceChart slabAddress={slab} />
           </ErrorBoundary>
 
           {/* Position / Account / Deposit — tabbed */}
