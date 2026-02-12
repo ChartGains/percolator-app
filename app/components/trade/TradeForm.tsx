@@ -320,7 +320,7 @@ export const TradeForm: FC<{ slabAddress: string }> = ({ slabAddress }) => {
       </div>
 
       {/* Leverage slider + presets */}
-      <div className="mb-3">
+      <div className="mb-5">
         <div className="mb-1 flex items-center justify-between">
           <label className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-dim)]">Leverage<InfoIcon tooltip="Multiplies your position size. 5x leverage means 5x the profit but also 5x the loss. Higher leverage = higher risk of liquidation." /></label>
           <span className="text-[11px] font-medium text-[var(--text)]" style={{ fontFamily: "var(--font-mono)" }}>{leverage}x</span>
