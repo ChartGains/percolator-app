@@ -397,6 +397,7 @@ const MyMarketsPage: FC = () => {
   const myMarkets = (realMyMarkets.length === 0 && mockMode ? mockMarkets : realMyMarkets) as MyMarket[];
   const loading = mockMode ? false : realLoading;
   const { connection } = useConnection();
+  const [filter, setFilter] = useState<"all" | "admin" | "lp" | "trader">("all");
   const [insuranceMintMap, setInsuranceMintMap] = useState<Record<string, boolean>>({});
   const [insuranceMintChecking, setInsuranceMintChecking] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -477,7 +478,7 @@ const MyMarketsPage: FC = () => {
           <h1 className="text-xl font-medium tracking-[-0.01em] text-[var(--text)] sm:text-2xl" style={{ fontFamily: "var(--font-heading)" }}>
             <span className="font-normal text-[var(--text-muted)]">Your </span>Markets
           </h1>
-          <p className="mt-2 mb-8 text-[13px] text-[var(--text-secondary)]">manage what you&apos;ve built.</p>
+          <p className="mt-2 mb-8 text-[13px] text-[var(--text-secondary)]">manage your markets and positions.</p>
           <div className="border border-[var(--border)]/50 bg-[var(--panel-bg)] p-10 text-center">
             <p className="text-[11px] text-[var(--text-secondary)]">connect your wallet to see your markets</p>
           </div>
@@ -497,7 +498,7 @@ const MyMarketsPage: FC = () => {
           <h1 className="text-xl font-medium tracking-[-0.01em] text-[var(--text)] sm:text-2xl" style={{ fontFamily: "var(--font-heading)" }}>
             <span className="font-normal text-[var(--text-muted)]">Your </span>Markets
           </h1>
-          <p className="mt-2 mb-8 text-[13px] text-[var(--text-secondary)]">manage what you&apos;ve built.</p>
+          <p className="mt-2 mb-8 text-[13px] text-[var(--text-secondary)]">manage your markets and positions.</p>
           <div className="border border-[var(--border)]/50 bg-[var(--panel-bg)] p-10 text-center">
             <p className="text-[11px] text-[var(--short)]">{error}</p>
           </div>
@@ -515,7 +516,7 @@ const MyMarketsPage: FC = () => {
           <h1 className="text-xl font-medium tracking-[-0.01em] text-[var(--text)] sm:text-2xl" style={{ fontFamily: "var(--font-heading)" }}>
             <span className="font-normal text-[var(--text-muted)]">Your </span>Markets
           </h1>
-          <p className="mt-2 mb-8 text-[13px] text-[var(--text-secondary)]">manage what you&apos;ve built.</p>
+          <p className="mt-2 mb-8 text-[13px] text-[var(--text-secondary)]">manage your markets and positions.</p>
           <div className="border border-[var(--border)]/50 bg-[var(--panel-bg)] p-10 text-center">
             <p className="mb-4 text-[11px] text-[var(--text-secondary)]">
               no markets created or traded on with this wallet.
@@ -549,7 +550,7 @@ const MyMarketsPage: FC = () => {
         <h1 className="text-xl font-medium tracking-[-0.01em] text-[var(--text)] sm:text-2xl" style={{ fontFamily: "var(--font-heading)" }}>
           <span className="font-normal text-[var(--text-muted)]">Your </span>Markets
         </h1>
-        <p className="mt-2 mb-6 text-[13px] text-[var(--text-secondary)]">manage what you&apos;ve built.</p>
+        <p className="mt-2 mb-6 text-[13px] text-[var(--text-secondary)]">manage your markets and positions.</p>
 
         {/* Summary Stats Bar */}
         <div className="hud-corners mb-8 flex flex-col gap-4 border border-[var(--border)]/50 bg-[var(--panel-bg)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -579,9 +580,29 @@ const MyMarketsPage: FC = () => {
           </div>
         </div>
 
+        {/* Filter Tabs */}
+        <div className="mb-4 flex border-b border-[var(--border)]/50">
+          {(["all", "admin", "lp", "trader"] as const).map((tab) => {
+            const count = tab === "all" ? myMarkets.length : myMarkets.filter(m => m.role === tab).length;
+            return (
+              <button
+                key={tab}
+                onClick={() => setFilter(tab)}
+                className={`px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.15em] transition-colors border-b-2 ${
+                  filter === tab
+                    ? "border-[var(--accent)] text-[var(--accent)]"
+                    : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                }`}
+              >
+                {tab === "lp" ? "LP" : tab} ({count})
+              </button>
+            );
+          })}
+        </div>
+
         {/* Market Cards */}
         <div className="grid gap-4">
-          {myMarkets.map((m) => (
+          {myMarkets.filter(m => filter === "all" || m.role === filter).map((m) => (
             <MarketCard
               key={m.slabAddress.toBase58()}
               market={m}
