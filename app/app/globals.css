@@ -671,13 +671,18 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   padding: 8px !important;
   margin: 0 !important;
   width: 100% !important;
+  max-width: 100% !important;
   display: flex !important;
   flex-direction: column !important;
+  grid-template-columns: 1fr !important;
 }
-.wallet-adapter-modal-list li {
+.wallet-adapter-modal-list li,
+.wallet-adapter-modal-list li button {
   margin: 0 !important;
   width: 100% !important;
+  max-width: 100% !important;
   list-style: none !important;
+  box-sizing: border-box !important;
 }
 .wallet-adapter-modal-list .wallet-adapter-button {
   background-color: var(--panel-bg) !important;
