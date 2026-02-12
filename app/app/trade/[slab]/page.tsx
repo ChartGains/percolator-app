@@ -191,7 +191,7 @@ function TradePageInner({ slab }: { slab: string }) {
           MOBILE LAYOUT  (< lg)
           Single column, everything stacked
           ════════════════════════════════════════════════════════ */}
-      <div className="flex flex-col gap-2 px-3 pb-4 lg:hidden min-w-0 w-full">
+      <div className="flex flex-col gap-2 px-3 pt-3 pb-4 lg:hidden min-w-0 w-full">
         {/* Chart */}
         <ErrorBoundary label="PriceChart">
           <div className="w-full overflow-hidden [&>div]:!h-[200px] [&>div]:!max-w-full">
