@@ -2,7 +2,10 @@
 
 import { use, useState, useRef, useEffect } from "react";
 import gsap from "gsap";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { SlabProvider, useSlabState } from "@/components/providers/SlabProvider";
+import { useUserAccount } from "@/hooks/useUserAccount";
+import { isMockMode } from "@/lib/mock-mode";
 import { TradeForm } from "@/components/trade/TradeForm";
 import { PositionPanel } from "@/components/trade/PositionPanel";
 import { AccountsCard } from "@/components/trade/AccountsCard";
@@ -41,8 +44,8 @@ function Collapsible({ title, defaultOpen = true, badge, children }: { title: st
   );
 }
 
-function Tabs({ tabs, children }: { tabs: string[]; children: React.ReactNode[] }) {
-  const [active, setActive] = useState(0);
+function Tabs({ tabs, children, defaultTab }: { tabs: string[]; children: React.ReactNode[]; defaultTab?: number }) {
+  const [active, setActive] = useState(defaultTab ?? 0);
   return (
     <div>
       <div className="flex border-b border-[var(--border)]/50 bg-transparent">
@@ -100,6 +103,15 @@ function TradePageInner({ slab }: { slab: string }) {
   const { priceUsd } = useLivePrice();
   const health = engine ? computeMarketHealth(engine) : null;
   const pageRef = useRef<HTMLDivElement>(null);
+  const { connected } = useWallet();
+  const userAccount = useUserAccount();
+  const mockMode = isMockMode();
+
+  // Determine default tab for Deposit/Position/Account tabs
+  let defaultLeftTab = 0; // Deposit
+  if (mockMode || (connected && userAccount && userAccount.account.capital > 0n)) {
+    defaultLeftTab = 1; // Position
+  }
 
   const symbol = tokenMeta?.symbol ?? (config?.collateralMint ? `${config.collateralMint.toBase58().slice(0, 4)}…${config.collateralMint.toBase58().slice(-4)}` : "TOKEN");
   const shortAddress = `${slab.slice(0, 4)}…${slab.slice(-4)}`;
@@ -206,17 +218,17 @@ function TradePageInner({ slab }: { slab: string }) {
           <TradeForm slabAddress={slab} />
         </ErrorBoundary>
 
+        {/* Deposit / Withdraw — collapsible */}
+        <ErrorBoundary label="DepositWithdrawCard">
+          <Collapsible title="Deposit / Withdraw" defaultOpen={!mockMode && !(connected && userAccount && userAccount.account.capital > 0n)}>
+            <DepositWithdrawCard slabAddress={slab} />
+          </Collapsible>
+        </ErrorBoundary>
+
         {/* Position — collapsible */}
         <ErrorBoundary label="PositionPanel">
           <Collapsible title="Position" defaultOpen={true}>
             <PositionPanel slabAddress={slab} />
-          </Collapsible>
-        </ErrorBoundary>
-
-        {/* Account / Deposit — collapsible */}
-        <ErrorBoundary label="DepositWithdrawCard">
-          <Collapsible title="Deposit / Withdraw" defaultOpen={false}>
-            <DepositWithdrawCard slabAddress={slab} />
           </Collapsible>
         </ErrorBoundary>
 
@@ -246,19 +258,12 @@ function TradePageInner({ slab }: { slab: string }) {
             <PriceChart slabAddress={slab} />
           </ErrorBoundary>
 
-          {/* Position / Account / Deposit — tabbed */}
-          <Tabs tabs={["Position", "Account", "Deposit"]}>
+          {/* Deposit / Position / Account — tabbed */}
+          <Tabs tabs={["Deposit", "Position", "Account"]} defaultTab={defaultLeftTab}>
+            <ErrorBoundary label="DepositWithdrawCard"><DepositWithdrawCard slabAddress={slab} /></ErrorBoundary>
             <ErrorBoundary label="PositionPanel"><PositionPanel slabAddress={slab} /></ErrorBoundary>
             <ErrorBoundary label="AccountsCard"><AccountsCard /></ErrorBoundary>
-            <ErrorBoundary label="DepositWithdrawCard"><DepositWithdrawCard slabAddress={slab} /></ErrorBoundary>
           </Tabs>
-
-          {/* Trade history — compact */}
-          <ErrorBoundary label="TradeHistory">
-            <Collapsible title="Recent Trades" defaultOpen={true}>
-              <TradeHistory slabAddress={slab} />
-            </Collapsible>
-          </ErrorBoundary>
         </div>
 
         {/* ── Right column ── */}

@@ -154,6 +154,15 @@ export const DepositWithdrawCard: FC<{ slabAddress: string }> = ({ slabAddress }
 
   return (
     <div className="relative rounded-none border border-[var(--border)]/50 bg-[var(--bg)]/80 p-3">
+      {/* Onboarding hint for new users */}
+      {capital === 0n && !mockMode && (
+        <div className="mb-3 border-b border-[var(--border)]/30 pb-3">
+          <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--accent)] mb-1">Getting Started</p>
+          <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+            Deposit collateral to start trading. Your collateral is the token you&apos;ll use as margin for leveraged positions.
+          </p>
+        </div>
+      )}
       <p className="mb-1 text-lg font-bold text-[var(--text)]" style={{ fontFamily: "var(--font-mono)" }}>{formatTokenAmount(capital, decimals)} <span className="text-xs font-normal text-[var(--text-secondary)]">{symbol}</span></p>
       {walletBalance !== null && (
         <p className="mb-2 text-[10px] text-[var(--text-dim)]" style={{ fontFamily: "var(--font-mono)" }}>Wallet: {formatTokenAmount(walletBalance, decimals)} {symbol}</p>
