@@ -86,7 +86,8 @@ export default function Home() {
   const heroRef = useRef<HTMLDivElement>(null);
   const prefersReduced = usePrefersReducedMotion();
   const [scrollY, setScrollY] = useState(0);
-  const [network, setNet] = useState(getConfig().network);
+  const [network, setNet] = useState("devnet");
+  useEffect(() => { setNet(getConfig().network); }, []);
 
   // Hero stagger animation on mount
   useEffect(() => {
@@ -131,8 +132,8 @@ export default function Home() {
             open_interest: m.open_interest || 0,
           })));
         }
-      } catch (err) {
-        console.error("Failed to load market stats:", err);
+      } catch {
+        // Silently fail — Supabase may not be configured in dev
       }
     }
     loadStats();
