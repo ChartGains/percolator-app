@@ -67,7 +67,7 @@ const MOCK_MARKETS: MergedMarket[] = [
   mockMarket("4nF7d2Z3oF8bTKwhat9k8xsR1TLAo9U7Bd2Rk3pYJne5", "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm", "WIF", "dogwifhat", 20, false, 0.847, 1_120_000, 65_000_000_000n, 90_000_000_000n, 8_000_000_000n),
   mockMarket("B8mnfpCEt2z3SMz4giHGPNMB3DzBAJEYrPq9Uhnj4zXh", "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", "JUP", "Jupiter", 10, false, 0.624, 540_000, 30_000_000_000n, 55_000_000_000n, 6_000_000_000n),
   mockMarket("HN7cABqLq46Es1jh92hQnvWo6BuZPdSmTQ5P2NMeVRgr", "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", "BONK", "Bonk", 5, true, 0.0000182, 320_000, 18_000_000_000n, 40_000_000_000n, 5_000_000_000n),
-  mockMarket("FMJ1DFWV96VKb5z8hnRp5LJaP7RPAywUbioiRvLqZafV", "RaydiumPoolxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "RAY", "Raydium", 10, false, 2.18, 410_000, 22_000_000_000n, 45_000_000_000n, 4_000_000_000n),
+  mockMarket("FMJ1DFWV96VKb5z8hnRp5LJaP7RPAywUbioiRvLqZafV", "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R", "RAY", "Raydium", 10, false, 2.18, 410_000, 22_000_000_000n, 45_000_000_000n, 4_000_000_000n),
   mockMarket("3Kat5BEzHTZmJYBR1QnP4FCn2jJRYkSgnTMGV4cANQrM", "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE", "ORCA", "Orca", 10, false, 3.42, 180_000, 12_000_000_000n, 28_000_000_000n, 3_000_000_000n),
   mockMarket("5F2nFaJfVoR91EVBTzkg9hEb8w2jhaQD65FKmjfwUzSN", "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So", "mSOL", "Marinade SOL", 15, false, 162.10, 670_000, 50_000_000_000n, 70_000_000_000n, 9_000_000_000n),
   mockMarket("ArK3jGAHqPxTEHsMgrLwRbKMzH4DS7nVPEfkjxhpb9fn", "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs", "WETH", "Wrapped Ether", 20, false, 3_241.88, 1_870_000, 78_000_000_000n, 110_000_000_000n, 12_000_000_000n),
