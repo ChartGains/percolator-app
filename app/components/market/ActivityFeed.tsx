@@ -55,10 +55,12 @@ export function ActivityFeed() {
   useEffect(() => {
     async function load() {
       const activities: ActivityItem[] = [];
+      const sb = getSupabase();
+      if (!sb) { setLoading(false); return; }
 
       // Fetch recent markets (new listings)
       try {
-        const { data: markets } = await getSupabase()
+        const { data: markets } = await sb
           .from("markets")
           .select("slab_address, symbol, name, created_at")
           .order("created_at", { ascending: false })
@@ -79,7 +81,7 @@ export function ActivityFeed() {
 
       // Fetch recent trades
       try {
-        const { data: trades } = await getSupabase()
+        const { data: trades } = await sb
           .from("trades")
           .select("id, slab_address, side, size, price, created_at, tx_sig")
           .order("created_at", { ascending: false })

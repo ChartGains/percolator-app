@@ -116,7 +116,9 @@ export default function Home() {
   useEffect(() => {
     async function loadStats() {
       try {
-        const { data } = await getSupabase().from("markets_with_stats").select("slab_address, symbol, volume_24h, insurance_balance, last_price, open_interest") as { data: { slab_address: string; symbol: string | null; volume_24h: number | null; insurance_balance: number | null; last_price: number | null; open_interest: number | null }[] | null };
+        const sb = getSupabase();
+        if (!sb) return;
+        const { data } = await sb.from("markets_with_stats").select("slab_address, symbol, volume_24h, insurance_balance, last_price, open_interest") as { data: { slab_address: string; symbol: string | null; volume_24h: number | null; insurance_balance: number | null; last_price: number | null; open_interest: number | null }[] | null };
         if (data) {
           setStats({
             markets: data.length,

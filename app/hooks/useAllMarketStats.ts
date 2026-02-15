@@ -18,12 +18,8 @@ export function useAllMarketStats() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    let supabase: ReturnType<typeof getSupabase>;
-    try {
-      supabase = getSupabase();
-    } catch {
-      // Supabase client creation can fail if env vars missing
-      setError("Database unavailable");
+    const supabase = getSupabase();
+    if (!supabase) {
       setLoading(false);
       return;
     }

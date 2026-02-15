@@ -3,6 +3,7 @@
 import { FC, useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useSlabState } from "@/components/providers/SlabProvider";
 import { useLivePrice } from "@/hooks/useLivePrice";
+import { isMockSlab, getMockPriceHistory } from "@/lib/mock-trade-data";
 
 type ChartType = "line" | "candle";
 type Timeframe = "1h" | "4h" | "1d" | "7d" | "30d";
@@ -79,6 +80,17 @@ export const TradingChart: FC<{ slabAddress: string; simulation?: boolean }> = (
   // Fetch price history (skip in simulation — live prices build up from WebSocket)
   useEffect(() => {
     if (simulation) return;
+
+    // Use mock data for mock slab addresses
+    if (isMockSlab(slabAddress)) {
+      const mockPrices = getMockPriceHistory(slabAddress).map((p) => ({
+        timestamp: p.timestamp * 1000, // seconds → ms
+        price: p.price_e6 / 1e6,
+      }));
+      setPrices(mockPrices);
+      return;
+    }
+
     fetch(`/api/markets/${slabAddress}/prices`)
       .then((r) => r.json())
       .then((d) => {
@@ -97,7 +109,7 @@ export const TradingChart: FC<{ slabAddress: string; simulation?: boolean }> = (
     const now = Date.now();
     setPrices((prev) => {
       const last = prev[prev.length - 1];
-      if (last && now - last.timestamp < 5000) return prev;
+      if (last && now - last.timestamp < 1500) return prev;
       return [...prev, { timestamp: now, price: priceUsd }].slice(-1000);
     });
   }, [config, priceUsd]);

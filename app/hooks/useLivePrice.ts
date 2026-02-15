@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSlabState } from "@/components/providers/SlabProvider";
+import { isMockSlab } from "@/lib/mock-trade-data";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "";
 if (!WS_URL && typeof window !== "undefined") {
@@ -189,6 +190,31 @@ export function useLivePrice(options?: { simulation?: boolean }): PriceState {
       }
     };
   }, [slabAddr, simulation]);
+
+  // Simulate live price ticks for mock slabs (no WebSocket available locally)
+  useEffect(() => {
+    if (!slabAddr || !isMockSlab(slabAddr)) return;
+
+    const interval = setInterval(() => {
+      setState((prev) => {
+        if (prev.price === null) return prev;
+        const volatility = prev.price * 0.001;
+        const noise = (Math.random() - 0.5) * volatility;
+        const newPrice = Math.max(prev.price * 0.5, prev.price + noise);
+        const e6 = BigInt(Math.round(newPrice * 1_000_000));
+        return {
+          ...prev,
+          price: newPrice,
+          priceUsd: newPrice,
+          priceE6: e6,
+          high24h: prev.high24h !== null ? Math.max(prev.high24h, newPrice) : newPrice,
+          low24h: prev.low24h !== null ? Math.min(prev.low24h, newPrice) : newPrice,
+        };
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [slabAddr]);
 
   return state;
 }

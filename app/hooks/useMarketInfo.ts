@@ -15,6 +15,7 @@ export function useMarketInfo(slabAddress: string) {
     setLoading(true);
     setError(null);
     const supabase = getSupabase();
+    if (!supabase) { setLoading(false); return; }
     async function load() {
       try {
         const { data, error: dbError } = await supabase
