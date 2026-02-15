@@ -7,14 +7,17 @@ import { useMarketDiscovery } from "@/hooks/useMarketDiscovery";
 import { computeMarketHealth } from "@/lib/health";
 import { HealthBadge } from "@/components/market/HealthBadge";
 import { formatTokenAmount } from "@/lib/format";
-import type { MarketWithStats } from "@/lib/supabase";
 import { getSupabase } from "@/lib/supabase";
+import type { Database } from "@/lib/database.types";
+
+type MarketWithStats = Database['public']['Views']['markets_with_stats']['Row'];
 import type { DiscoveredMarket } from "@percolator/core";
 import { PublicKey } from "@solana/web3.js";
 import { ShimmerSkeleton } from "@/components/ui/ShimmerSkeleton";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { GlowButton } from "@/components/ui/GlowButton";
 import { useMultiTokenMeta } from "@/hooks/useMultiTokenMeta";
+import { useAllMarketStats } from "@/hooks/useAllMarketStats";
 
 function formatNum(n: number | null | undefined): string {
   if (n === null || n === undefined) return "\u2014";
@@ -72,11 +75,11 @@ const MOCK_MARKETS: MergedMarket[] = [
 ];
 
 function MarketsPageInner() {
+  useEffect(() => { document.title = "Markets — Percolator"; }, []);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { markets: discovered, loading: discoveryLoading } = useMarketDiscovery();
-  const [supabaseMarkets, setSupabaseMarkets] = useState<MarketWithStats[]>([]);
-  const [supabaseLoading, setSupabaseLoading] = useState(true);
+  const { statsMap, loading: statsLoading } = useAllMarketStats();
   
   // P-MED-2: Read filters from URL params
   const [search, setSearch] = useState(searchParams.get("q") || "");
@@ -84,6 +87,7 @@ function MarketsPageInner() {
   const [sortBy, setSortBy] = useState<SortKey>((searchParams.get("sort") as SortKey) || "volume");
   const [leverageFilter, setLeverageFilter] = useState<LeverageFilter>((searchParams.get("lev") as LeverageFilter) || "all");
   const [oracleFilter, setOracleFilter] = useState<OracleFilter>((searchParams.get("oracle") as OracleFilter) || "all");
+  const [showUsd, setShowUsd] = useState<boolean>(searchParams.get("usd") === "true");
   
   // P-MED-3: Pagination state for infinite scroll
   const [displayCount, setDisplayCount] = useState(20);
@@ -104,29 +108,13 @@ function MarketsPageInner() {
     if (sortBy !== "volume") params.set("sort", sortBy);
     if (leverageFilter !== "all") params.set("lev", leverageFilter);
     if (oracleFilter !== "all") params.set("oracle", oracleFilter);
+    if (showUsd) params.set("usd", "true");
     
     const newUrl = params.toString() ? `?${params.toString()}` : "/markets";
     router.replace(newUrl, { scroll: false });
-  }, [debouncedSearch, sortBy, leverageFilter, oracleFilter, router]);
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const { data } = await getSupabase().from("markets_with_stats").select("*");
-        setSupabaseMarkets(data || []);
-      } catch (e) {
-        console.error("[Markets] Supabase fetch failed:", e);
-        setSupabaseMarkets([]);
-      } finally {
-        setSupabaseLoading(false);
-      }
-    }
-    load();
-  }, []);
+  }, [debouncedSearch, sortBy, leverageFilter, oracleFilter, showUsd, router]);
 
   const merged = useMemo<MergedMarket[]>(() => {
-    const sbMap = new Map<string, MarketWithStats>();
-    for (const m of supabaseMarkets) sbMap.set(m.slab_address, m);
     return discovered
       .filter((d) => {
         // Skip malformed markets with undefined PublicKey fields
@@ -139,27 +127,28 @@ function MarketsPageInner() {
       .map((d) => {
         const addr = d.slabAddress.toBase58();
         const mint = d.config.collateralMint.toBase58();
-        const sb = sbMap.get(addr) ?? null;
         const maxLev = d.params.initialMarginBps > 0n ? Math.floor(10000 / Number(d.params.initialMarginBps)) : 0;
         const isAdminOracle = d.config.indexFeedId.equals(PublicKey.default);
-        return { slabAddress: addr, mintAddress: mint, symbol: sb?.symbol ?? null, name: sb?.name ?? null, maxLeverage: maxLev, isAdminOracle, onChain: d, supabase: sb };
+        // Fetch stats from Supabase
+        const stats = statsMap.get(addr) || null;
+        return { slabAddress: addr, mintAddress: mint, symbol: null, name: null, maxLeverage: maxLev, isAdminOracle, onChain: d, supabase: stats };
       });
-  }, [discovered, supabaseMarkets]);
+  }, [discovered, statsMap]);
 
   // Only show mock data in development (never in production)
   const effectiveMarkets = merged.length > 0 ? merged : (process.env.NODE_ENV === "development" ? MOCK_MARKETS : []);
 
-  // Resolve on-chain token metadata for markets missing Supabase symbol
-  const missingMints = useMemo(() => {
+  // Fetch on-chain token metadata for ALL markets (no Supabase)
+  const allMints = useMemo(() => {
     return effectiveMarkets
-      .filter(m => !m.symbol && m.mintAddress)
+      .filter(m => m.mintAddress)
       .map(m => new PublicKey(m.mintAddress));
   }, [effectiveMarkets]);
-  const tokenMetaMap = useMultiTokenMeta(missingMints);
+  const tokenMetaMap = useMultiTokenMeta(allMints);
 
   const filtered = useMemo(() => {
     let list = effectiveMarkets;
-    // Text search — matches symbol, name, slab address, OR mint address
+    // Text search — matches on-chain symbol, name, slab address, OR mint address
     if (debouncedSearch.trim()) {
       const q = debouncedSearch.toLowerCase();
       list = list.filter((m) => {
@@ -185,9 +174,12 @@ function MarketsPageInner() {
     }
     list = [...list].sort((a, b) => {
       switch (sortBy) {
-        case "volume": return (b.supabase?.volume_24h ?? 0) - (a.supabase?.volume_24h ?? 0);
+        case "volume": 
+          // No Supabase volume data - sort by OI instead
+          const oiA_vol = a.onChain.engine.totalOpenInterest ?? 0n;
+          const oiB_vol = b.onChain.engine.totalOpenInterest ?? 0n;
+          return oiB_vol > oiA_vol ? 1 : oiB_vol < oiA_vol ? -1 : 0;
         case "oi": {
-          // P-CRITICAL-5: Add null coalescing before BigInt sort
           const oiA = a.onChain.engine.totalOpenInterest ?? 0n;
           const oiB = b.onChain.engine.totalOpenInterest ?? 0n;
           return oiB > oiA ? 1 : oiB < oiA ? -1 : 0;
@@ -198,6 +190,9 @@ function MarketsPageInner() {
           const order: Record<string, number> = { healthy: 0, caution: 1, warning: 2, empty: 3 };
           return (order[ha.level] ?? 5) - (order[hb.level] ?? 5);
         }
+        case "recent":
+          // Sort by most recently added (slab address is sequential-ish)
+          return b.slabAddress.localeCompare(a.slabAddress);
         default: return 0;
       }
     });
@@ -233,7 +228,7 @@ function MarketsPageInner() {
   }, [debouncedSearch, leverageFilter, oracleFilter, sortBy]);
 
   const displayedMarkets = filtered.slice(0, displayCount);
-  const loading = discoveryLoading || supabaseLoading;
+  const loading = discoveryLoading || statsLoading;
 
   // P-MED-4: Separate clear functions
   const clearFilters = () => {
@@ -324,6 +319,32 @@ function MarketsPageInner() {
           {/* Filters row */}
           <div className="mb-6 flex flex-wrap items-center gap-3">
             <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--text-dim)]">filter:</span>
+
+            {/* USD/Token toggle */}
+            <div className="flex gap-1 rounded-sm border border-[var(--border)] bg-[var(--bg-elevated)] p-0.5">
+              <button
+                onClick={() => setShowUsd(false)}
+                className={[
+                  "rounded-sm px-2.5 py-1 text-[10px] font-medium transition-all duration-200",
+                  !showUsd
+                    ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                    : "text-[var(--text-dim)] hover:text-[var(--text-secondary)]",
+                ].join(" ")}
+              >
+                tokens
+              </button>
+              <button
+                onClick={() => setShowUsd(true)}
+                className={[
+                  "rounded-sm px-2.5 py-1 text-[10px] font-medium transition-all duration-200",
+                  showUsd
+                    ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                    : "text-[var(--text-dim)] hover:text-[var(--text-secondary)]",
+                ].join(" ")}
+              >
+                usd
+              </button>
+            </div>
 
             {/* Leverage filter */}
             <div className="flex gap-1 rounded-sm border border-[var(--border)] bg-[var(--bg-elevated)] p-0.5">
@@ -416,8 +437,8 @@ function MarketsPageInner() {
           ) : (
             <>
               <div className="relative rounded-sm border border-[var(--border)] hud-corners overflow-x-auto">
-                {/* Header row */}
-                <div className="grid min-w-[640px] grid-cols-[2fr_1fr_1fr_1fr_1fr_0.7fr_0.7fr] gap-3 border-b border-[var(--border)] bg-[var(--bg-surface)] px-4 py-2.5 text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--text-dim)]">
+                {/* Header row - responsive grid columns */}
+                <div className="grid min-w-[500px] sm:min-w-[700px] grid-cols-[minmax(140px,2fr)_minmax(70px,1fr)_minmax(70px,1fr)_minmax(70px,1fr)_minmax(50px,0.7fr)] sm:grid-cols-[minmax(140px,2fr)_minmax(70px,1fr)_minmax(70px,1fr)_minmax(70px,1fr)_minmax(70px,1fr)_minmax(50px,0.7fr)_minmax(50px,0.7fr)] gap-3 border-b border-[var(--border)] bg-[var(--bg-surface)] px-4 py-2.5 text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--text-dim)]">
                   <div>token</div>
                   <div className="text-right">price</div>
                   <div className="text-right">OI</div>
@@ -429,16 +450,32 @@ function MarketsPageInner() {
 
                 {displayedMarkets.map((m, i) => {
                   const health = computeMarketHealth(m.onChain.engine);
-                  const oiTokens = formatTokenAmount(m.onChain.engine.totalOpenInterest);
-                  const insuranceTokens = formatTokenAmount(m.onChain.engine.insuranceFund.balance);
                   const lastPrice = m.supabase?.last_price;
+                  
+                  // Token amounts
+                  const oiTokensRaw = m.onChain.engine.totalOpenInterest;
+                  const insuranceTokensRaw = m.onChain.engine.insuranceFund.balance;
+                  const volume24hRaw = m.supabase?.volume_24h != null ? BigInt(m.supabase.volume_24h) : null;
+                  
+                  // Display values (USD or tokens)
+                  const oiDisplay = showUsd && lastPrice != null
+                    ? formatNum((Number(oiTokensRaw) / 1e6) * lastPrice)
+                    : formatTokenAmount(oiTokensRaw);
+                  const insuranceDisplay = showUsd && lastPrice != null
+                    ? formatNum((Number(insuranceTokensRaw) / 1e6) * lastPrice)
+                    : formatTokenAmount(insuranceTokensRaw);
+                  const volumeDisplay = volume24hRaw != null
+                    ? (showUsd && lastPrice != null
+                        ? formatNum((Number(volume24hRaw) / 1e6) * lastPrice)
+                        : formatTokenAmount(volume24hRaw))
+                    : null;
 
                   return (
                     <Link
                       key={m.slabAddress}
                       href={`/trade/${m.slabAddress}`}
                       className={[
-                        "grid min-w-[640px] grid-cols-[2fr_1fr_1fr_1fr_1fr_0.7fr_0.7fr] gap-3 items-center px-4 py-3 transition-all duration-200 hover:bg-[var(--accent)]/[0.04] hover:border-l-2 hover:border-l-[var(--accent)]/30",
+                        "grid min-w-[500px] sm:min-w-[700px] grid-cols-[minmax(140px,2fr)_minmax(70px,1fr)_minmax(70px,1fr)_minmax(70px,1fr)_minmax(50px,0.7fr)] sm:grid-cols-[minmax(140px,2fr)_minmax(70px,1fr)_minmax(70px,1fr)_minmax(70px,1fr)_minmax(70px,1fr)_minmax(50px,0.7fr)_minmax(50px,0.7fr)] gap-3 items-center px-4 py-3 transition-all duration-200 hover:bg-[var(--accent)]/[0.04] hover:border-l-2 hover:border-l-[var(--accent)]/30",
                         i > 0 ? "border-t border-[var(--border)]" : "",
                       ].join(" ")}
                     >
@@ -455,17 +492,19 @@ function MarketsPageInner() {
                           {m.name ? `${m.name} · ${shortenAddress(m.mintAddress)}` : tokenMetaMap.get(m.mintAddress)?.name ? `${tokenMetaMap.get(m.mintAddress)!.name} · ${shortenAddress(m.mintAddress)}` : shortenAddress(m.mintAddress)}
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right truncate">
                         <span className="text-sm text-white" style={{ fontFamily: "var(--font-jetbrains-mono)" }}>
                           {lastPrice != null
                             ? `$${lastPrice < 0.01 ? lastPrice.toFixed(6) : lastPrice < 1 ? lastPrice.toFixed(4) : lastPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                             : "\u2014"}
                         </span>
                       </div>
-                      <div className="text-right text-sm text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-jetbrains-mono)" }}>{oiTokens}</div>
-                      <div className="text-right text-sm text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-jetbrains-mono)" }}>{m.supabase?.volume_24h ? formatNum(m.supabase.volume_24h) : "\u2014"}</div>
-                      <div className="text-right text-sm text-[var(--text)]" style={{ fontFamily: "var(--font-jetbrains-mono)" }}>{insuranceTokens}</div>
-                      <div className="text-right text-sm text-[var(--text-secondary)]">{m.maxLeverage}x</div>
+                      <div className="text-right text-sm text-[var(--text-secondary)] truncate" style={{ fontFamily: "var(--font-jetbrains-mono)" }}>{oiDisplay}</div>
+                      <div className="text-right text-sm text-[var(--text-secondary)] truncate" style={{ fontFamily: "var(--font-jetbrains-mono)" }}>
+                        {volumeDisplay ?? "\u2014"}
+                      </div>
+                      <div className="text-right text-sm text-[var(--text)] truncate hidden sm:block" style={{ fontFamily: "var(--font-jetbrains-mono)" }}>{insuranceDisplay}</div>
+                      <div className="text-right text-sm text-[var(--text-secondary)] hidden sm:block">{m.maxLeverage}x</div>
                       <div className="text-right"><HealthBadge level={health.level} /></div>
                     </Link>
                   );

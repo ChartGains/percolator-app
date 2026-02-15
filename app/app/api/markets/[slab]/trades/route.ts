@@ -33,17 +33,20 @@ export async function POST(
 ) {
   if (!requireAuth(req)) return UNAUTHORIZED;
   const { slab } = await params;
-  const apiKey = req.headers.get("x-api-key");
-  if (apiKey !== process.env.INDEXER_API_KEY) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   const body = await req.json();
   const supabase = getServiceClient();
 
+  // Allowlist fields to prevent mass assignment
   const { error } = await (supabase.from("trades") as any).insert({
     slab_address: slab,
-    ...body,
+    trader: body.trader,
+    side: body.side,
+    size: body.size,
+    price: body.price,
+    fee: body.fee,
+    tx_signature: body.tx_signature,
+    slot: body.slot,
   });
 
   if (error) {

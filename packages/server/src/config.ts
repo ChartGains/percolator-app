@@ -17,6 +17,7 @@ export const config = {
   crankKeypair: process.env.CRANK_KEYPAIR ?? "",
   supabaseUrl: process.env.SUPABASE_URL ?? "",
   supabaseKey: process.env.SUPABASE_KEY ?? "",
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   heliusApiKey: process.env.HELIUS_API_KEY ?? "",
   fallbackRpcUrl: process.env.FALLBACK_RPC_URL ?? "https://api.devnet.solana.com",
   port: Number(process.env.PORT ?? 3001),
@@ -24,4 +25,8 @@ export const config = {
   crankInactiveIntervalMs: Number(process.env.CRANK_INACTIVE_INTERVAL_MS ?? 60_000),
   /** BH4: Reduced to 60s to catch markets created/deleted within smaller window */
   discoveryIntervalMs: Number(process.env.DISCOVERY_INTERVAL_MS ?? 60_000),
+  /** Helius webhook secret for auth validation */
+  webhookSecret: process.env.HELIUS_WEBHOOK_SECRET ?? "",
+  /** Public URL for webhook registration (e.g. Railway URL) */
+  webhookUrl: process.env.WEBHOOK_URL ?? "",
 } as const;

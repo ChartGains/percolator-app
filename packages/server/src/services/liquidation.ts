@@ -45,6 +45,8 @@ export class LiquidationService {
   private liquidationCount = 0;
   private scanCount = 0;
   private lastScanTime = 0;
+  // Overlap guard: prevent concurrent scan cycles from interleaving
+  private _scanning = false;
   // BC1: Signature replay protection
   private recentSignatures = new Map<string, number>(); // signature -> timestamp
   private readonly signatureTTLMs = 60_000; // 60 seconds
@@ -77,9 +79,12 @@ export class LiquidationService {
 
       // BC2: Check oracle staleness - reject if timestamp > 60s old
       const now = BigInt(Math.floor(Date.now() / 1000));
-      const priceAge = now - cfg.authorityTimestamp;
+      const priceAge = cfg.authorityTimestamp > 0n ? now - cfg.authorityTimestamp : now;
       if (priceAge > 60n) {
-        console.warn(`[LiquidationService] Skipping ${slabAddress}: oracle price is ${priceAge}s old (max 60s)`);
+        // Only log for markets with actual positions (reduce noise)
+        if (engine.totalOpenInterest > 0n) {
+          console.warn(`[LiquidationService] Skipping ${slabAddress}: oracle price is ${priceAge}s old (max 60s)`);
+        }
         return []; // Don't liquidate with stale prices
       }
 
@@ -381,8 +386,13 @@ export class LiquidationService {
     console.log(`[LiquidationService] Starting with interval ${this.intervalMs}ms`);
 
     this.timer = setInterval(async () => {
+      // Overlap guard: skip if previous cycle is still running (mirrors CrankService pattern)
+      if (this._scanning) return;
+      this._scanning = true;
       try {
-        const result = await this.scanAndLiquidateAll(getMarkets());
+        // Snapshot the market map to avoid iteration issues if markets are added/removed
+        const marketsSnapshot = new Map(getMarkets());
+        const result = await this.scanAndLiquidateAll(marketsSnapshot);
         if (result.candidates > 0) {
           console.log(
             `[LiquidationService] Scan: ${result.scanned} markets, ${result.candidates} candidates, ${result.liquidated} liquidated`,
@@ -390,6 +400,8 @@ export class LiquidationService {
         }
       } catch (err) {
         console.error("[LiquidationService] Failed to complete liquidation cycle:", err);
+      } finally {
+        this._scanning = false;
       }
     }, this.intervalMs);
   }

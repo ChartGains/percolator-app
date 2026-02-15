@@ -44,3 +44,13 @@ lerna-debug.log*
 # Turbo
 .turbo
 .env.vercel.preview
+
+# Supabase CLI temp files
+supabase/.temp/
+
+Percolator-Deck-Final.pdf
+Percolator-Deck-v2.pdf
+Percolator-Pitch-Deck.pdf
+pitch-deck.html
+render-pdf.cjs
+render-pdf.mjs

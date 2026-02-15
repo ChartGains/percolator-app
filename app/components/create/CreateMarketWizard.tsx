@@ -143,6 +143,8 @@ const QuickLaunchPanel: FC<{
 
   const handleQuickCreate = () => {
     if (!quickLaunch.config || !publicKey) return;
+    // Guard: trading fee must be less than initial margin
+    if (effectiveTradingFee >= effectiveMargin) return;
     const c = quickLaunch.config;
     const pool = quickLaunch.poolInfo;
     const tier = SLAB_TIERS[quickSlabTier];
@@ -181,9 +183,50 @@ const QuickLaunchPanel: FC<{
     create(params);
   };
 
+  const handleQuickRetry = () => {
+    if (!quickLaunch.config || !publicKey || !state.slabAddress) return;
+    if (effectiveTradingFee >= effectiveMargin) return;
+    const c = quickLaunch.config;
+    const pool = quickLaunch.poolInfo;
+    const tier = SLAB_TIERS[quickSlabTier];
+
+    let oracleFeed: string;
+    let priceE6: number;
+
+    if (pool) {
+      const poolPk = new PublicKey(pool.poolAddress);
+      oracleFeed = Array.from(poolPk.toBytes()).map((b) => b.toString(16).padStart(2, "0")).join("");
+      priceE6 = Math.round(pool.priceUsd * 1_000_000);
+    } else {
+      oracleFeed = "0".repeat(64);
+      const parsed = parseFloat(manualPrice);
+      priceE6 = isNaN(parsed) ? 1_000_000 : Math.round(parsed * 1_000_000);
+    }
+
+    const params: CreateMarketParams = {
+      mint: new PublicKey(c.mint),
+      initialPriceE6: BigInt(priceE6 > 0 ? priceE6 : 1_000_000),
+      lpCollateral: parseHumanAmount(effectiveLpCollateral, c.decimals),
+      insuranceAmount: parseHumanAmount(insuranceAmount, c.decimals),
+      oracleFeed,
+      invert: false,
+      tradingFeeBps: effectiveTradingFee,
+      initialMarginBps: effectiveMargin,
+      maxAccounts: tier.maxAccounts,
+      slabDataSize: tier.dataSize,
+      symbol: c.symbol ?? "UNKNOWN",
+      name: c.name ?? "Unknown Token",
+      decimals: c.decimals ?? 6,
+      ...(enableVamm && {
+        vammParams: { spreadBps: vammSpreadBps, impactKBps: vammImpactKBps, maxTotalBps: vammMaxTotalBps, liquidityE6: vammLiquidityE6 },
+      }),
+    };
+    create(params, state.step);
+  };
+
   /* ── Creation progress ── */
   if (state.loading || state.step > 0 || state.error) {
-    return <CreationProgress state={state} onReset={reset} />;
+    return <CreationProgress state={state} onReset={reset} onRetry={handleQuickRetry} />;
   }
 
   return (
@@ -384,9 +427,16 @@ const QuickLaunchPanel: FC<{
             <p className="text-[10px] text-[var(--text-dim)]">Checking wallet balance...</p>
           )}
 
+          {/* Fee exceeds margin warning */}
+          {effectiveTradingFee >= effectiveMargin && (
+            <div className="border border-[var(--short)]/20 bg-[var(--short)]/[0.04] p-3">
+              <p className="text-[11px] text-[var(--short)]">Trading fee ({effectiveTradingFee} bps) must be less than initial margin ({effectiveMargin} bps). Lower the fee or increase the margin.</p>
+            </div>
+          )}
+
           {/* Launch button */}
-          <button onClick={handleQuickCreate} disabled={!publicKey || !quickLaunch.config || !hasTokens} className={btnPrimary}>
-            {!publicKey ? "Connect Wallet to Launch" : !hasTokens ? "No Tokens — Mint First" : "Launch Market"}
+          <button onClick={handleQuickCreate} disabled={!publicKey || !quickLaunch.config || !hasTokens || effectiveTradingFee >= effectiveMargin} className={btnPrimary}>
+            {!publicKey ? "Connect Wallet to Launch" : !hasTokens ? "No Tokens — Mint First" : effectiveTradingFee >= effectiveMargin ? "Fee Must Be Less Than Margin" : "Launch Market"}
           </button>
         </>
       )}
@@ -553,13 +603,15 @@ export const CreateMarketWizard: FC<{ initialMint?: string }> = ({ initialMint }
 
   const maintenanceMarginBps = Math.floor(initialMarginBps / 2);
   const maxLeverage = Math.floor(10000 / initialMarginBps);
-  const step2Valid = tradingFeeBps >= 1 && tradingFeeBps <= 100 && initialMarginBps >= 100 && initialMarginBps <= 5000;
+  const feeExceedsMargin = tradingFeeBps >= initialMarginBps;
+  const step2Valid = tradingFeeBps >= 1 && tradingFeeBps <= 100 && initialMarginBps >= 100 && initialMarginBps <= 5000 && !feeExceedsMargin;
 
   const lpValid = lpCollateral !== "" && !isNaN(Number(lpCollateral)) && Number(lpCollateral) > 0;
   const insValid = insuranceAmount !== "" && !isNaN(Number(insuranceAmount)) && Number(insuranceAmount) > 0;
   const step3Valid = lpValid && insValid;
   const hasManualTokens = tokenBalance !== null && tokenBalance > 0n;
-  const allValid = step1Valid && step2Valid && step3Valid && hasManualTokens;
+  const decimalsValid = decimals <= 12; // Block tokens with > 12 decimals (u64 overflow risk)
+  const allValid = step1Valid && step2Valid && step3Valid && hasManualTokens && decimalsValid;
 
   const lpNative = useMemo(() => { try { return lpValid ? parseHumanAmount(lpCollateral, decimals) : 0n; } catch { return 0n; } }, [lpCollateral, decimals, lpValid]);
   const insNative = useMemo(() => { try { return insValid ? parseHumanAmount(insuranceAmount, decimals) : 0n; } catch { return 0n; } }, [insuranceAmount, decimals, insValid]);
@@ -692,11 +744,14 @@ export const CreateMarketWizard: FC<{ initialMint?: string }> = ({ initialMint }
                 <input type="text" value={mint} onChange={(e) => setMint(e.target.value.trim())} placeholder="e.g. EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" className={mint && !mintValid ? inputClassError : inputClassMono} />
                 {mint && !mintValid && <p className="mt-1 text-[10px] text-[var(--short)]">Invalid base58 public key</p>}
                 {tokenMeta && mintValid && (
-                  <div className="mt-2 flex items-center gap-3 border border-[var(--accent)]/20 bg-[var(--accent)]/[0.03] p-3">
-                    <div className="flex h-7 w-7 items-center justify-center border border-[var(--accent)]/30 text-[10px] font-bold text-[var(--accent)]">{tokenMeta.symbol.slice(0, 2)}</div>
+                  <div className={`mt-2 flex items-center gap-3 border p-3 ${tokenMeta.decimals > 12 ? "border-[var(--short)]/40 bg-[var(--short)]/[0.05]" : "border-[var(--accent)]/20 bg-[var(--accent)]/[0.03]"}`}>
+                    <div className={`flex h-7 w-7 items-center justify-center border text-[10px] font-bold ${tokenMeta.decimals > 12 ? "border-[var(--short)]/30 text-[var(--short)]" : "border-[var(--accent)]/30 text-[var(--accent)]"}`}>{tokenMeta.symbol.slice(0, 2)}</div>
                     <div>
                       <p className="text-[12px] font-medium text-[var(--text)]">{tokenMeta.name} ({tokenMeta.symbol})</p>
                       <p className="text-[10px] text-[var(--text-muted)]">{tokenMeta.decimals} decimals</p>
+                      {tokenMeta.decimals > 12 && (
+                        <p className="text-[10px] text-[var(--short)] font-medium mt-0.5">⚠ Decimals &gt; 12 risk integer overflow in on-chain arithmetic. Market creation blocked.</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -873,6 +928,12 @@ export const CreateMarketWizard: FC<{ initialMint?: string }> = ({ initialMint }
                 <FieldHint>{initialMarginBps} bps = {maxLeverage}x max leverage.</FieldHint>
                 <input type="range" min={100} max={5000} step={100} value={initialMarginBps} onChange={(e) => setInitialMarginBps(Number(e.target.value))} className="mt-2 w-full" />
               </div>
+              {feeExceedsMargin && (
+                <div className="border border-[var(--short)]/30 bg-[var(--short)]/5 p-3">
+                  <p className="text-[11px] text-[var(--short)] font-medium">⚠ Trading fee ({tradingFeeBps} bps) must be less than initial margin ({initialMarginBps} bps)</p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1">When the fee exceeds the margin, a single trade would consume the entire margin. Lower the trading fee or increase the initial margin.</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-px overflow-hidden border border-[var(--border)] bg-[var(--border)]">
                 <div className="bg-[var(--panel-bg)] p-3">
                   <p className="text-[9px] font-medium uppercase tracking-[0.15em] text-[var(--text-dim)]">Maintenance Margin</p>

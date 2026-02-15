@@ -13,10 +13,14 @@ import { setupWebSocket } from "./routes/ws.js";
 import { PriceEngine } from "./services/PriceEngine.js";
 import { LiquidationService } from "./services/liquidation.js";
 import { InsuranceLPService } from "./services/InsuranceLPService.js";
-import { TradeIndexer } from "./services/TradeIndexer.js";
-import { insuranceRoutes } from "./routes/insurance.js";
+import { TradeIndexerPolling } from "./services/TradeIndexer.js";
+import { HeliusWebhookManager } from "./services/HeliusWebhookManager.js";
+import { StatsCollector } from "./services/StatsCollector.js";
+import { webhookRoutes } from "./routes/webhook.js";
+import { tradeRoutes } from "./routes/trades.js";
 import { oracleRouterRoutes } from "./routes/oracle-router.js";
 import { readRateLimit, writeRateLimit } from "./middleware/rate-limit.js";
+import { SimulationService, type Scenario } from "./services/SimulationService.js";
 
 // Services
 const oracleService = new OracleService();
@@ -25,7 +29,10 @@ const crankService = new CrankService(oracleService);
 const liquidationService = new LiquidationService(oracleService);
 const lifecycleManager = new MarketLifecycleManager(crankService, oracleService);
 const insuranceService = new InsuranceLPService(crankService);
-const tradeIndexer = new TradeIndexer();
+const tradeIndexer = new TradeIndexerPolling();
+const webhookManager = new HeliusWebhookManager();
+const statsCollector = new StatsCollector(crankService, oracleService);
+const simulationService = new SimulationService();
 
 // Hono app
 const app = new Hono();
@@ -50,8 +57,62 @@ app.route("/", healthRoutes({ crankService, liquidationService }));
 app.route("/", marketRoutes({ crankService, lifecycleManager }));
 app.route("/", priceRoutes({ oracleService, priceEngine }));
 app.route("/", crankRoutes({ crankService }));
-app.route("/", insuranceRoutes({ insuranceService }));
 app.route("/", oracleRouterRoutes());
+app.route("/", webhookRoutes());
+app.route("/", tradeRoutes());
+
+// Webhook diagnostics
+app.get("/webhook/status", async (c) => {
+  const status = webhookManager.getStatus();
+  const webhooks = await webhookManager.listWebhooks();
+  return c.json({ ...status, registeredWebhooks: webhooks?.length ?? "unknown" });
+});
+app.post("/webhook/re-register", async (c) => {
+  const result = await webhookManager.reRegister();
+  return c.json(result);
+});
+
+// Simulation endpoints
+app.post("/api/simulation/start", async (c) => {
+  const body = await c.req.json() as {
+    slabAddress: string;
+    oracleSecret: string;
+    startPriceE6?: number;
+    intervalMs?: number;
+    tokenSymbol?: string;
+    tokenName?: string;
+    mintAddress?: string;
+    creatorWallet?: string;
+  };
+  const result = await simulationService.start(body);
+  return c.json(result, result.ok ? 200 : 400);
+});
+
+app.post("/api/simulation/stop", async (c) => {
+  const result = await simulationService.stop();
+  return c.json(result);
+});
+
+app.get("/api/simulation", (c) => {
+  const state = simulationService.getState();
+  return c.json(state ?? { running: false });
+});
+
+app.post("/api/simulation/scenario", async (c) => {
+  const body = await c.req.json() as { scenario: Scenario };
+  const result = simulationService.setScenario(body.scenario);
+  return c.json(result, result.ok ? 200 : 400);
+});
+
+app.get("/api/simulation/history", (c) => {
+  const history = simulationService.getHistory();
+  return c.json(history);
+});
+
+app.get("/api/simulation/bots", (c) => {
+  const state = simulationService.getState();
+  return c.json(state?.bots ?? []);
+});
 
 // Root
 app.get("/", (c) => c.json({ name: "@percolator/server", version: "0.1.0" }));
@@ -90,14 +151,36 @@ if (config.crankKeypair) {
     insuranceService.start();
     console.log("🛡️  Insurance LP service started");
 
-    // Start trade indexer
+    // Start trade indexer (polling backup)
     tradeIndexer.start();
-    console.log("📊 Trade indexer started");
+    console.log("📊 Trade indexer started (polling backup)");
+
+    // Start stats collector (populates market_stats + oracle_prices tables)
+    statsCollector.start();
+    console.log("📈 Stats collector started (market_stats + oracle_prices)");
+
+    // Register Helius webhook for primary trade indexing
+    webhookManager.start().then(() => {
+      console.log("🪝 Helius webhook manager started");
+    }).catch((err) => {
+      console.error("Failed to start webhook manager:", err);
+    });
   }).catch((err) => {
     console.error("Failed to start crank service:", err);
   });
+  // Trade indexer also started inside crank block (reactive mode)
 } else {
   console.warn("⚠️  CRANK_KEYPAIR not set — crank service disabled");
+  // Still start trade indexer in polling-only mode (no crank events, but polls markets)
+  tradeIndexer.start();
+  console.log("📊 Trade indexer started (polling-only mode, no crank keypair)");
+
+  // Register Helius webhook even without crank keypair
+  webhookManager.start().then(() => {
+    console.log("🪝 Helius webhook manager started");
+  }).catch((err) => {
+    console.error("Failed to start webhook manager:", err);
+  });
 }
 
 // Graceful shutdown
@@ -109,6 +192,8 @@ async function shutdown(signal: string) {
     liquidationService.stop();
     insuranceService.stop();
     tradeIndexer.stop();
+    webhookManager.stop();
+    statsCollector.stop();
     if (server && typeof (server as any).close === "function") {
       (server as any).close();
     }

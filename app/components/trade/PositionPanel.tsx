@@ -20,6 +20,7 @@ import {
 import { humanizeError } from "@/lib/errorMessages";
 import { isMockMode } from "@/lib/mock-mode";
 import { isMockSlab, getMockUserAccount } from "@/lib/mock-trade-data";
+import { WarmupProgress } from "./WarmupProgress";
 
 function abs(n: bigint): bigint {
   return n < 0n ? -n : n;
@@ -44,10 +45,13 @@ export const PositionPanel: FC<{ slabAddress: string }> = ({ slabAddress }) => {
     entryPrice: bigint;
   } | null>(null);
 
-  const lpIdx = useMemo(() => {
-    const lp = accounts.find(({ account }) => account.kind === AccountKind.LP);
-    return lp?.idx ?? 0;
+  const lpEntry = useMemo(() => {
+    return accounts.find(({ account }) => account.kind === AccountKind.LP) ?? null;
   }, [accounts]);
+  const lpIdx = lpEntry?.idx ?? 0;
+
+  // Bug #267a67ef: LP with 0 capital cannot accept counterparty positions
+  const lpUnderfunded = lpEntry !== null && lpEntry.account.capital === 0n;
 
   if (!userAccount) {
     return (
@@ -66,8 +70,8 @@ export const PositionPanel: FC<{ slabAddress: string }> = ({ slabAddress }) => {
   const hasPosition = account.positionSize !== 0n;
   const isLong = account.positionSize > 0n;
   const absPosition = abs(account.positionSize);
-  const onChainPriceE6 = config?.lastEffectivePriceE6 ?? 0n;
-  const currentPriceE6 = livePriceE6 ?? onChainPriceE6;
+  const onChainPriceE6 = config?.lastEffectivePriceE6 ?? null;
+  const currentPriceE6 = livePriceE6 ?? onChainPriceE6 ?? 0n;
 
   const entryPriceE6 = account.entryPrice;
 
@@ -77,14 +81,15 @@ export const PositionPanel: FC<{ slabAddress: string }> = ({ slabAddress }) => {
     entryPrice: account.entryPrice,
   };
 
-  const pnlTokens = computeMarkPnl(
+  // Bug fix: Don't compute P&L with stale/zero price to avoid flash
+  const pnlTokens = currentPriceE6 > 0n ? computeMarkPnl(
     displayData.positionSize,
     displayData.entryPrice,
     currentPriceE6,
-  );
+  ) : 0n;
   const pnlUsd =
-    priceUsd !== null ? (Number(pnlTokens) / 1e6) * priceUsd : null;
-  const roe = computePnlPercent(pnlTokens, displayData.capital);
+    priceUsd !== null && currentPriceE6 > 0n ? (Number(pnlTokens) / 1e6) * priceUsd : null;
+  const roe = currentPriceE6 > 0n ? computePnlPercent(pnlTokens, displayData.capital) : 0;
 
   const maintenanceBps = params?.maintenanceMarginBps ?? 500n;
   const liqPriceE6 = computeLiqPrice(
@@ -248,13 +253,37 @@ export const PositionPanel: FC<{ slabAddress: string }> = ({ slabAddress }) => {
                 {marginHealthStr}
               </span>
             </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-dim)]">Est. Funding (24h)</span>
+              <span className="text-[11px] font-medium text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>
+                -
+              </span>
+            </div>
           </div>
+
+          {/* Warmup Progress (if active) */}
+          <div className="mt-3 border-t border-[var(--border)] pt-3">
+            <WarmupProgress
+              slabAddress={slabAddress}
+              accountIdx={userAccount.idx}
+            />
+          </div>
+
+          {/* LP underfunded warning */}
+          {lpUnderfunded && (
+            <div className="mt-2 rounded-none border border-[var(--warning)]/30 bg-[var(--warning)]/5 p-2.5">
+              <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--warning)]">LP Has No Capital</p>
+              <p className="mt-1 text-[10px] text-[var(--warning)]/70">
+                The liquidity provider has no capital to back the counterparty position. Closing trades will fail until the LP is funded.
+              </p>
+            </div>
+          )}
 
           {/* Close button with confirmation */}
           {!showConfirm ? (
             <button
               onClick={() => setShowConfirm(true)}
-              disabled={closeLoading}
+              disabled={closeLoading || lpUnderfunded}
               className="mt-2 w-full rounded-none border border-[var(--short)]/30 py-2 text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--short)] transition-all duration-150 hover:bg-[var(--short)]/8 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Close Position

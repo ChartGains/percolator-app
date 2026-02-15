@@ -3,6 +3,7 @@
 import { use, useState, useRef, useEffect } from "react";
 import gsap from "gsap";
 import { SlabProvider, useSlabState } from "@/components/providers/SlabProvider";
+import { UsdToggleProvider, useUsdToggle } from "@/components/providers/UsdToggleProvider";
 import { TradeForm } from "@/components/trade/TradeForm";
 import { PositionPanel } from "@/components/trade/PositionPanel";
 import { AccountsCard } from "@/components/trade/AccountsCard";
@@ -10,8 +11,11 @@ import { DepositWithdrawCard } from "@/components/trade/DepositWithdrawCard";
 import { EngineHealthCard } from "@/components/trade/EngineHealthCard";
 import { MarketStatsCard } from "@/components/trade/MarketStatsCard";
 import { MarketBookCard } from "@/components/trade/MarketBookCard";
-import { PriceChart } from "@/components/trade/PriceChart";
+import { TradingChart } from "@/components/trade/TradingChart";
 import { TradeHistory } from "@/components/trade/TradeHistory";
+import { LiquidationAnalytics } from "@/components/trade/LiquidationAnalytics";
+import { CrankHealthCard } from "@/components/trade/CrankHealthCard";
+import { SystemCapitalCard } from "@/components/trade/SystemCapitalCard";
 import { HealthBadge } from "@/components/market/HealthBadge";
 import { ShareButton } from "@/components/market/ShareCard";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
@@ -21,6 +25,37 @@ import { useTokenMeta } from "@/hooks/useTokenMeta";
 import { useToast } from "@/hooks/useToast";
 
 /* ── Reusable tiny components ─────────────────────────────── */
+
+function UsdToggleButton() {
+  const { showUsd, setShowUsd } = useUsdToggle();
+  return (
+    <div className="flex gap-0.5 rounded-sm border border-[var(--border)] bg-[var(--bg-elevated)] p-0.5">
+      <button
+        onClick={() => setShowUsd(false)}
+        className={[
+          "rounded-sm px-2 py-0.5 text-[9px] font-medium transition-all duration-200",
+          !showUsd
+            ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+            : "text-[var(--text-dim)] hover:text-[var(--text-secondary)]",
+        ].join(" ")}
+      >
+        tokens
+      </button>
+      <button
+        onClick={() => setShowUsd(true)}
+        className={[
+          "rounded-sm px-2 py-0.5 text-[9px] font-medium transition-all duration-200",
+          showUsd
+            ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+            : "text-[var(--text-dim)] hover:text-[var(--text-secondary)]",
+        ].join(" ")}
+      >
+        usd
+      </button>
+    </div>
+  );
+}
+
 
 function Collapsible({ title, defaultOpen = true, badge, children }: { title: string; defaultOpen?: boolean; badge?: React.ReactNode; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -95,7 +130,7 @@ function CopyButton({ text }: { text: string }) {
 /* ── Main inner page ──────────────────────────────────────── */
 
 function TradePageInner({ slab }: { slab: string }) {
-  const { engine, config, accounts } = useSlabState();
+  const { engine, config, accounts, loading: slabLoading, error: slabError } = useSlabState();
   const tokenMeta = useTokenMeta(config?.collateralMint ?? null);
   const { priceUsd } = useLivePrice();
   const health = engine ? computeMarketHealth(engine) : null;
@@ -106,6 +141,12 @@ function TradePageInner({ slab }: { slab: string }) {
 
   const symbol = tokenMeta?.symbol ?? (config?.collateralMint ? `${config.collateralMint.toBase58().slice(0, 4)}…${config.collateralMint.toBase58().slice(-4)}` : "TOKEN");
   const shortAddress = `${slab.slice(0, 4)}…${slab.slice(-4)}`;
+
+  // Dynamic page title
+  useEffect(() => {
+    document.title = `${symbol}/USD — Percolator`;
+  }, [symbol]);
+
 
   const priceDisplay = priceUsd != null
     ? `$${priceUsd < 0.01 ? priceUsd.toFixed(6) : priceUsd < 1 ? priceUsd.toFixed(4) : priceUsd.toFixed(2)}`
@@ -120,6 +161,36 @@ function TradePageInner({ slab }: { slab: string }) {
     gsap.fromTo(pageRef.current, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" });
   }, []);
 
+  // Loading state — show while slab data is being fetched
+  if (slabLoading && !engine) {
+    return (
+      <div className="min-h-[calc(100vh-48px)] flex flex-col items-center justify-center gap-3">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+        <p className="text-[11px] text-[var(--text-muted)] uppercase tracking-[0.15em]">Loading market data...</p>
+        <p className="text-[10px] text-[var(--text-dim)]" style={{ fontFamily: "var(--font-mono)" }}>{slab.slice(0, 8)}...{slab.slice(-8)}</p>
+      </div>
+    );
+  }
+
+  // Error state — show when slab data fails to load
+  if (slabError && !engine) {
+    return (
+      <div className="min-h-[calc(100vh-48px)] flex flex-col items-center justify-center gap-3">
+        <div className="border border-[var(--short)]/30 bg-[var(--short)]/5 p-6 text-center max-w-md">
+          <p className="text-sm font-medium text-[var(--short)]">Failed to load market</p>
+          <p className="mt-2 text-[11px] text-[var(--text-secondary)]">{slabError}</p>
+          <p className="mt-2 text-[10px] text-[var(--text-dim)]" style={{ fontFamily: "var(--font-mono)" }}>{slab}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 border border-[var(--border)] px-4 py-1.5 text-[11px] text-[var(--text-secondary)] hover:border-[var(--accent)]/40 hover:text-[var(--text)] transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div ref={pageRef} className="mx-auto max-w-7xl overflow-x-hidden gsap-fade">
 
@@ -132,6 +203,7 @@ function TradePageInner({ slab }: { slab: string }) {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            <UsdToggleButton />
             {health && <HealthBadge level={health.level} />}
             {priceDisplay && (
               <span className="text-sm font-bold text-[var(--text)]" style={{ fontFamily: "var(--font-mono)" }}>{priceDisplay}</span>
@@ -171,11 +243,14 @@ function TradePageInner({ slab }: { slab: string }) {
             />
           </div>
         </div>
-        {priceDisplay && (
-          <div className="text-right">
-            <div className="text-xl font-bold text-[var(--text)]" style={{ fontFamily: "var(--font-mono)" }}>{priceDisplay}</div>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          <UsdToggleButton />
+          {priceDisplay && (
+            <div className="text-right">
+              <div className="text-xl font-bold text-[var(--text)]" style={{ fontFamily: "var(--font-mono)" }}>{priceDisplay}</div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Quick start guide — desktop only, hidden after first trade ── */}
@@ -198,9 +273,9 @@ function TradePageInner({ slab }: { slab: string }) {
           ════════════════════════════════════════════════════════ */}
       <div className="flex flex-col gap-1.5 px-2 pt-2 pb-4 lg:hidden min-w-0 w-full">
         {/* Chart */}
-        <ErrorBoundary label="PriceChart">
+        <ErrorBoundary label="TradingChart">
           <div className="w-full overflow-hidden">
-            <PriceChart slabAddress={slab} />
+            <TradingChart slabAddress={slab} />
           </div>
         </ErrorBoundary>
 
@@ -230,9 +305,14 @@ function TradePageInner({ slab }: { slab: string }) {
         </ErrorBoundary>
 
         {/* Bottom tabs: Stats | Trades | Book */}
-        <Tabs tabs={["Stats", "Trades", "Book"]}>
+        <Tabs tabs={["Stats", "Trades", "Risk", "Book"]}>
           <ErrorBoundary label="MarketStatsCard"><MarketStatsCard /></ErrorBoundary>
           <ErrorBoundary label="TradeHistory"><TradeHistory slabAddress={slab} /></ErrorBoundary>
+          <ErrorBoundary label="RiskAnalytics">
+            <CrankHealthCard />
+            <div className="mt-2"><LiquidationAnalytics /></div>
+            <div className="mt-2"><SystemCapitalCard /></div>
+          </ErrorBoundary>
           <ErrorBoundary label="MarketBookCard"><MarketBookCard /></ErrorBoundary>
         </Tabs>
       </div>
@@ -245,8 +325,8 @@ function TradePageInner({ slab }: { slab: string }) {
         {/* ── Left column ── */}
         <div className="min-w-0 space-y-1.5">
           {/* Chart */}
-          <ErrorBoundary label="PriceChart">
-            <PriceChart slabAddress={slab} />
+          <ErrorBoundary label="TradingChart">
+            <TradingChart slabAddress={slab} />
           </ErrorBoundary>
 
           {/* Position / Account / Deposit — tabbed */}
@@ -267,10 +347,17 @@ function TradePageInner({ slab }: { slab: string }) {
           </div>
 
           {/* Market info tabs */}
-          <Tabs tabs={["Stats", "Trades", "Health", "Book"]}>
+          <Tabs tabs={["Stats", "Trades", "Health", "Risk", "Book"]}>
             <ErrorBoundary label="MarketStatsCard"><MarketStatsCard /></ErrorBoundary>
             <ErrorBoundary label="TradeHistory"><TradeHistory slabAddress={slab} /></ErrorBoundary>
-            <ErrorBoundary label="EngineHealthCard"><EngineHealthCard /></ErrorBoundary>
+            <ErrorBoundary label="EngineHealthCard">
+              <EngineHealthCard />
+              <div className="mt-2"><CrankHealthCard /></div>
+            </ErrorBoundary>
+            <ErrorBoundary label="RiskAnalytics">
+              <LiquidationAnalytics />
+              <div className="mt-2"><SystemCapitalCard /></div>
+            </ErrorBoundary>
             <ErrorBoundary label="MarketBookCard"><MarketBookCard /></ErrorBoundary>
           </Tabs>
         </div>
@@ -284,7 +371,9 @@ export default function TradePage({ params }: { params: Promise<{ slab: string }
 
   return (
     <SlabProvider slabAddress={slab}>
-      <TradePageInner slab={slab} />
+      <UsdToggleProvider>
+        <TradePageInner slab={slab} />
+      </UsdToggleProvider>
     </SlabProvider>
   );
 }

@@ -18,6 +18,7 @@ const interTight = Inter_Tight({ variable: "--font-inter-tight", subsets: ["lati
 const outfit = Outfit({ variable: "--font-outfit", subsets: ["latin"], weight: ["300", "400", "500", "600", "700", "800"] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://percolatorlaunch.com"),
   title: "Percolator — Perpetual Futures for Any Token",
   description: "Deploy a perpetual futures market on Solana in one click. No smart contract. No permission. Up to 20x leverage on any SPL token.",
   icons: {
@@ -25,6 +26,7 @@ export const metadata: Metadata = {
     apple: '/icon.png',
   },
   openGraph: {
+    url: "https://percolatorlaunch.com",
     title: "Percolator — Perpetual Futures for Any Token",
     description: "Deploy a perpetual futures market on Solana in one click. No smart contract. No permission. Up to 20x leverage on any SPL token.",
     type: "website",
@@ -39,8 +41,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-        <body className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} ${interTight.variable} ${outfit.variable} min-h-screen bg-[#050508] text-[#eeeef0] antialiased`}>
+    <html lang="en" suppressHydrationWarning>
+        <body suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} ${interTight.variable} ${outfit.variable} min-h-screen bg-[#050508] text-[#eeeef0] antialiased`}>
         <Providers>
           <CursorGlow />
           <div className="relative z-[1] flex min-h-screen flex-col">

@@ -1,7 +1,8 @@
 "use client";
 
 import { FC, useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import gsap from "gsap";
 import { useTrade } from "@/hooks/useTrade";
 import { humanizeError, withTransientRetry } from "@/lib/errorMessages";
@@ -43,7 +44,8 @@ function abs(n: bigint): bigint {
 }
 
 export const TradeForm: FC<{ slabAddress: string }> = ({ slabAddress }) => {
-  const { connected: walletConnected } = useWallet();
+  const { connected: walletConnected, publicKey } = useWallet();
+  const { connection } = useConnection();
   const realUserAccount = useUserAccount();
   const mockMode = isMockMode() && isMockSlab(slabAddress);
   const connected = walletConnected || mockMode;
@@ -54,7 +56,12 @@ export const TradeForm: FC<{ slabAddress: string }> = ({ slabAddress }) => {
   const tokenMeta = useTokenMeta(mktConfig?.collateralMint ?? null);
   const { priceUsd } = useLivePrice();
   const symbol = tokenMeta?.symbol ?? "Token";
-  const decimals = tokenMeta?.decimals ?? 6;
+  
+  // BUG FIX: Fetch on-chain decimals from token account (like DepositWithdrawCard)
+  // Don't rely solely on tokenMeta which may fail for cross-network tokens
+  const [onChainDecimals, setOnChainDecimals] = useState<number | null>(null);
+  const decimals = onChainDecimals ?? tokenMeta?.decimals ?? 6;
+  
   const prefersReduced = usePrefersReducedMotion();
 
   // Risk reduction gate detection
@@ -78,6 +85,11 @@ export const TradeForm: FC<{ slabAddress: string }> = ({ slabAddress }) => {
   }, [accounts]);
   const lpIdx = lpEntry?.idx ?? 0;
   const hasValidLP = lpEntry !== null;
+
+  // Bug #267a67ef: Detect when LP has insufficient capital to accept trades.
+  // If LP capital is 0 (or below minimum margin for any trade), the on-chain
+  // program will reject trades with Custom(14) Undercollateralized on the LP side.
+  const lpUnderfunded = hasValidLP && lpEntry!.account.capital === 0n;
 
   const initialMarginBps = params?.initialMarginBps ?? 1000n;
   const maintenanceMarginBps = params?.maintenanceMarginBps ?? 500n;
@@ -109,11 +121,37 @@ export const TradeForm: FC<{ slabAddress: string }> = ({ slabAddress }) => {
   const setMarginPercent = useCallback(
     (pct: number) => {
       if (capital <= 0n) return;
-      const amount = (capital * BigInt(pct)) / 100n;
+      let amount = (capital * BigInt(pct)) / 100n;
+      // Prevent truncation to 0 for small balances — use at least 1 native unit
+      // when the percentage of a non-zero capital would otherwise round to zero
+      if (amount === 0n && pct > 0) amount = 1n;
       setMarginInput(formatPerc(amount, decimals));
     },
     [capital, decimals]
   );
+
+  // BUG FIX: Fetch on-chain decimals from user's token account
+  // This ensures correct decimals even for cross-network tokens or missing metadata
+  useEffect(() => {
+    if (!publicKey || !mktConfig?.collateralMint || mockMode) {
+      setOnChainDecimals(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const ata = getAssociatedTokenAddressSync(mktConfig.collateralMint, publicKey);
+        const info = await connection.getTokenAccountBalance(ata);
+        if (!cancelled && info.value.decimals !== undefined) {
+          setOnChainDecimals(info.value.decimals);
+        }
+      } catch {
+        // Token account may not exist yet, keep using fallback decimals
+        if (!cancelled) setOnChainDecimals(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [publicKey, mktConfig?.collateralMint, connection, mockMode]);
 
   // Direction toggle GSAP bounce
   useEffect(() => {
@@ -157,11 +195,25 @@ export const TradeForm: FC<{ slabAddress: string }> = ({ slabAddress }) => {
     );
   }
 
-  if (!hasValidLP) {
+  // NOTE: LP validation disabled - matcher context check was too strict
+  // All current markets have LPs with default matcher context which is valid
+  // if (!hasValidLP) {
+  //   return (
+  //     <div className="relative rounded-none bg-[var(--bg)]/80 border border-[var(--border)]/50 p-4 text-center">
+  //       <p className="text-[var(--text-secondary)] text-xs">
+  //         No liquidity provider found for this market. Trading is not available until an LP initializes a vAMM.
+  //       </p>
+  //     </div>
+  //   );
+  // }
+
+  if (lpUnderfunded) {
     return (
       <div className="relative rounded-none bg-[var(--bg)]/80 border border-[var(--border)]/50 p-4 text-center">
-        <p className="text-[var(--text-secondary)] text-xs">
-          No liquidity provider found for this market. Trading is not available until an LP initializes a vAMM.
+        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--warning)]">⚠ Liquidity Unavailable</p>
+        <p className="mt-1.5 text-[10px] text-[var(--text-secondary)] leading-relaxed">
+          The market&apos;s liquidity provider has no capital. Trades cannot be executed until the LP is funded.
+          Contact the market admin to deposit collateral into the LP account.
         </p>
       </div>
     );

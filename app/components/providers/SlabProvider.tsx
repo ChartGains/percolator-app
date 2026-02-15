@@ -11,7 +11,7 @@ import {
   useCallback,
 } from "react";
 import { PublicKey } from "@solana/web3.js";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useConnection } from "@solana/wallet-adapter-react";
 import {
   parseHeader,
   parseConfig,
@@ -62,7 +62,6 @@ const POLL_INTERVAL_MS = 3000;
 
 export const SlabProvider: FC<{ children: ReactNode; slabAddress: string }> = ({ children, slabAddress }) => {
   const { connection } = useConnection();
-  const { publicKey } = useWallet();
   const [state, setState] = useState<SlabState>({ ...defaultState, slabAddress });
   const wsActive = useRef(false);
   const fetchRef = useRef<() => void>(() => {});
@@ -126,9 +125,14 @@ export const SlabProvider: FC<{ children: ReactNode; slabAddress: string }> = ({
         const info = await connection.getAccountInfo(slabPk);
         if (info) {
           parseSlab(new Uint8Array(info.data), info.owner);
+        } else {
+          // Slab account doesn't exist on-chain
+          setState((s) => ({ ...s, loading: false, error: "Market not found on-chain. It may have been closed or the address is invalid." }));
         }
-      } catch {
-        // RPC failure — will retry on next poll
+      } catch (e) {
+        console.error("[SlabProvider] RPC poll error:", e);
+        // Set error on first load so page doesn't show loading forever
+        setState((s) => s.engine ? s : { ...s, loading: false, error: `RPC error: ${e instanceof Error ? e.message : "connection failed"}` });
       }
     }
 
@@ -150,7 +154,7 @@ export const SlabProvider: FC<{ children: ReactNode; slabAddress: string }> = ({
       if (subId !== undefined) connection.removeAccountChangeListener(subId);
       if (timer) clearTimeout(timer);
     };
-  }, [connection.rpcEndpoint, slabAddress, publicKey?.toBase58()]);
+  }, [connection.rpcEndpoint, slabAddress]);
 
   // Re-poll immediately when tab becomes visible (browser sleep/wake)
   useEffect(() => {
