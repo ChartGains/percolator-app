@@ -18,15 +18,11 @@ export function useAllMarketStats() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    const supabase = getSupabase();
-    if (!supabase) {
-      setLoading(false);
-      return;
-    }
+    const sb = getSupabase();
 
     async function load() {
       try {
-        const { data, error: dbError } = await supabase
+        const { data, error: dbError } = await sb
           .from("markets_with_stats")
           .select("*");
 
@@ -53,9 +49,9 @@ export function useAllMarketStats() {
 
     // Subscribe to market_stats updates (WebSocket)
     // Wrapped in try/catch — Safari/iOS blocks insecure WebSocket on HTTPS pages
-    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let channel: ReturnType<typeof sb.channel> | null = null;
     try {
-      channel = supabase
+      channel = sb
         .channel("all-market-stats")
         .on("postgres_changes", {
           event: "*",
@@ -75,7 +71,7 @@ export function useAllMarketStats() {
 
     return () => {
       clearInterval(pollInterval);
-      if (channel) supabase.removeChannel(channel);
+      if (channel) sb.removeChannel(channel);
     };
   }, []);
 

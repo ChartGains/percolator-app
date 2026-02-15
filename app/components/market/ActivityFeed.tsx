@@ -56,7 +56,6 @@ export function ActivityFeed() {
     async function load() {
       const activities: ActivityItem[] = [];
       const sb = getSupabase();
-      if (!sb) { setLoading(false); return; }
 
       // Fetch recent markets (new listings)
       try {
