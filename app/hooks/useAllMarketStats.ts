@@ -18,7 +18,9 @@ export function useAllMarketStats() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    const sb = getSupabase();
+    const _sb = getSupabase();
+    if (!_sb) { setLoading(false); return; }
+    const sb = _sb;
 
     async function load() {
       try {
