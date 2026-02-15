@@ -135,8 +135,9 @@ function MarketsPageInner() {
       });
   }, [discovered, statsMap]);
 
-  // Only show mock data in development (never in production)
-  const effectiveMarkets = merged.length > 0 ? merged : (process.env.NODE_ENV === "development" ? MOCK_MARKETS : []);
+  // Show mock data when no real markets are discovered
+  const mockEnabled = process.env.NEXT_PUBLIC_MOCK_DATA === "true" || process.env.NEXT_PUBLIC_MOCK_DATA === "1" || process.env.NODE_ENV === "development";
+  const effectiveMarkets = merged.length > 0 ? merged : (mockEnabled ? MOCK_MARKETS : []);
 
   // Fetch on-chain token metadata for ALL markets (no Supabase)
   const allMints = useMemo(() => {
