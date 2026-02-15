@@ -23,7 +23,7 @@ export function getServiceClient() {
   if (!_serviceClient) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !serviceKey) return null;
+    if (!url || !serviceKey) throw new Error("Missing Supabase service-role env vars");
     _serviceClient = createClient<Database>(url, serviceKey);
   }
   return _serviceClient;
